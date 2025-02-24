@@ -1,17 +1,45 @@
 
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChefHat, Menu, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "./ui/use-toast";
 
 export const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [user, setUser] = useState(null);
+
+  // Check auth state
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setUser(session?.user ?? null);
+  });
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    setUser(session?.user ?? null);
+  });
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigate("/");
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to sign out.",
+      });
+    }
+  };
 
   const links = [
     { href: "/", label: "Home" },
     { href: "/explore", label: "Explore Chefs" },
-    { href: "/dashboard", label: "Dashboard" },
+    ...(user ? [{ href: "/dashboard", label: "Dashboard" }] : []),
   ];
 
   return (
@@ -40,10 +68,16 @@ export const Navigation = () => {
                 {link.label}
               </Link>
             ))}
-            <Button variant="outline" size="sm" className="ml-4">
-              <User className="h-4 w-4 mr-2" />
-              Sign In
-            </Button>
+            {user ? (
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                Sign Out
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => navigate("/auth/signin")}>
+                <User className="h-4 w-4 mr-2" />
+                Sign In
+              </Button>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -80,10 +114,16 @@ export const Navigation = () => {
                 {link.label}
               </Link>
             ))}
-            <Button variant="outline" size="sm" className="w-full mt-4">
-              <User className="h-4 w-4 mr-2" />
-              Sign In
-            </Button>
+            {user ? (
+              <Button variant="outline" size="sm" onClick={handleSignOut} className="w-full mt-4">
+                Sign Out
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" className="w-full mt-4" onClick={() => navigate("/auth/signin")}>
+                <User className="h-4 w-4 mr-2" />
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
       )}
