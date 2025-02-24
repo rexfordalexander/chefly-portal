@@ -76,12 +76,14 @@ const ChefExplore = () => {
           location,
           rating,
           specialties,
+          cuisine_types,
           profiles!inner (
             first_name,
             last_name,
             avatar_url
           )
         `)
+        .eq('status', 'approved') // Only show approved chefs
         .order('rating', { ascending: false });
 
       if (selectedCuisine) {
