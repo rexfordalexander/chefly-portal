@@ -69,6 +69,36 @@ export type Database = {
           },
         ]
       }
+      chef_cuisines: {
+        Row: {
+          chef_id: string
+          cuisine_id: string
+        }
+        Insert: {
+          chef_id: string
+          cuisine_id: string
+        }
+        Update: {
+          chef_id?: string
+          cuisine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chef_cuisines_chef_id_fkey"
+            columns: ["chef_id"]
+            isOneToOne: false
+            referencedRelation: "chef_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chef_cuisines_cuisine_id_fkey"
+            columns: ["cuisine_id"]
+            isOneToOne: false
+            referencedRelation: "cuisine_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chef_portfolio: {
         Row: {
           chef_id: string | null
@@ -106,36 +136,57 @@ export type Database = {
       }
       chef_profiles: {
         Row: {
+          availability: Json | null
+          available_for_instant_booking: boolean | null
           bio: string | null
           created_at: string | null
           cuisine_types: Database["public"]["Enums"]["cuisine_type"][] | null
           hourly_rate: number | null
           id: string
           location: string | null
+          price_range: number[] | null
+          rating: number | null
+          specialties: string[] | null
           status: Database["public"]["Enums"]["chef_status"] | null
+          total_reviews: number | null
           updated_at: string | null
+          verified: boolean | null
           years_of_experience: number | null
         }
         Insert: {
+          availability?: Json | null
+          available_for_instant_booking?: boolean | null
           bio?: string | null
           created_at?: string | null
           cuisine_types?: Database["public"]["Enums"]["cuisine_type"][] | null
           hourly_rate?: number | null
           id: string
           location?: string | null
+          price_range?: number[] | null
+          rating?: number | null
+          specialties?: string[] | null
           status?: Database["public"]["Enums"]["chef_status"] | null
+          total_reviews?: number | null
           updated_at?: string | null
+          verified?: boolean | null
           years_of_experience?: number | null
         }
         Update: {
+          availability?: Json | null
+          available_for_instant_booking?: boolean | null
           bio?: string | null
           created_at?: string | null
           cuisine_types?: Database["public"]["Enums"]["cuisine_type"][] | null
           hourly_rate?: number | null
           id?: string
           location?: string | null
+          price_range?: number[] | null
+          rating?: number | null
+          specialties?: string[] | null
           status?: Database["public"]["Enums"]["chef_status"] | null
+          total_reviews?: number | null
           updated_at?: string | null
+          verified?: boolean | null
           years_of_experience?: number | null
         }
         Relationships: [
@@ -147,6 +198,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cuisine_types: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {

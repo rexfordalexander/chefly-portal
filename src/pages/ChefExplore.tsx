@@ -39,6 +39,12 @@ interface Chef {
   cuisines: string[];
 }
 
+interface CuisineType {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 const ChefExplore = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState<string>("");
@@ -46,13 +52,12 @@ const ChefExplore = () => {
   const [minRating, setMinRating] = useState(0);
 
   // Fetch cuisine types
-  const { data: cuisineTypes } = useQuery({
+  const { data: cuisineTypes } = useQuery<CuisineType[]>({
     queryKey: ['cuisineTypes'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('cuisine_types')
-        .select('*')
-        .order('name');
+        .select('id, name, created_at');
       
       if (error) throw error;
       return data;
@@ -60,19 +65,22 @@ const ChefExplore = () => {
   });
 
   // Fetch chefs with filters
-  const { data: chefs, isLoading } = useQuery({
+  const { data: chefs, isLoading } = useQuery<Chef[]>({
     queryKey: ['chefs', selectedCuisine, priceRange, minRating, searchQuery],
     queryFn: async () => {
       let query = supabase
         .from('chef_profiles')
         .select(`
           id,
-          profiles:id(first_name, last_name, avatar_url),
-          rating,
-          location,
           hourly_rate,
-          cuisine_types,
-          specialties
+          location,
+          rating,
+          specialties,
+          profiles!inner (
+            first_name,
+            last_name,
+            avatar_url
+          )
         `)
         .order('rating', { ascending: false });
 
@@ -105,12 +113,12 @@ const ChefExplore = () => {
         id: chef.id,
         name: `${chef.profiles.first_name} ${chef.profiles.last_name}`,
         image: chef.profiles.avatar_url || 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80',
-        rating: chef.rating,
-        location: chef.location,
+        rating: chef.rating || 0,
+        location: chef.location || 'Location not specified',
         specialty: chef.specialties?.[0] || 'Various Cuisines',
-        price: chef.hourly_rate,
+        price: chef.hourly_rate || 0,
         cuisines: chef.cuisine_types || []
-      })) || [];
+      })) as Chef[];
     }
   });
 
