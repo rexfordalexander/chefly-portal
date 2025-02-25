@@ -1,26 +1,10 @@
 
 import { useState, useEffect } from "react";
-import { ChefCard } from "@/components/ChefCard";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Search, SlidersHorizontal, X } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { SearchBar } from "@/components/chef/SearchBar";
+import { FiltersSheet } from "@/components/chef/FiltersSheet";
+import { ChefGrid } from "@/components/chef/ChefGrid";
 
 interface Chef {
   id: string;
@@ -119,7 +103,7 @@ const ChefExplore = () => {
     }
   });
 
-  // Subscribe to real-time updates for chef_profiles
+  // Subscribe to real-time updates
   useEffect(() => {
     const channel = supabase
       .channel('chef-profiles-changes')
@@ -142,6 +126,12 @@ const ChefExplore = () => {
     };
   }, [queryClient]);
 
+  const handleClearFilters = () => {
+    setSelectedCuisine("");
+    setMinRating(0);
+    setPriceRange([0, 500]);
+  };
+
   return (
     <div className="container py-20">
       <div className="max-w-2xl mx-auto text-center mb-12">
@@ -150,108 +140,20 @@ const ChefExplore = () => {
           Discover talented chefs in your area and book your next culinary experience
         </p>
         <div className="flex gap-2 max-w-md mx-auto">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search by location or cuisine..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon">
-                <SlidersHorizontal className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent>
-              <SheetHeader>
-                <SheetTitle>Filter Chefs</SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Cuisine Type</label>
-                  <Select
-                    value={selectedCuisine}
-                    onValueChange={setSelectedCuisine}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All cuisines" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All cuisines</SelectItem>
-                      {cuisineTypes?.map((cuisine) => (
-                        <SelectItem key={cuisine.id} value={cuisine.name}>
-                          {cuisine.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Price Range ($/hr)</label>
-                  <Slider
-                    min={0}
-                    max={500}
-                    step={10}
-                    value={priceRange}
-                    onValueChange={setPriceRange}
-                  />
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>${priceRange[0]}</span>
-                    <span>${priceRange[1]}</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Minimum Rating</label>
-                  <Slider
-                    min={0}
-                    max={5}
-                    step={0.5}
-                    value={[minRating]}
-                    onValueChange={([value]) => setMinRating(value)}
-                  />
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>{minRating} stars</span>
-                  </div>
-                </div>
-                {(selectedCuisine || minRating > 0 || priceRange[0] > 0 || priceRange[1] < 500) && (
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setSelectedCuisine("");
-                      setMinRating(0);
-                      setPriceRange([0, 500]);
-                    }}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Clear Filters
-                  </Button>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+          <SearchBar value={searchQuery} onChange={setSearchQuery} />
+          <FiltersSheet
+            cuisineTypes={cuisineTypes || []}
+            selectedCuisine={selectedCuisine}
+            onCuisineChange={setSelectedCuisine}
+            priceRange={priceRange}
+            onPriceRangeChange={setPriceRange}
+            minRating={minRating}
+            onMinRatingChange={setMinRating}
+            onClearFilters={handleClearFilters}
+          />
         </div>
       </div>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {isLoading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-[400px] rounded-lg bg-muted animate-pulse"
-            />
-          ))
-        ) : chefs?.length === 0 ? (
-          <div className="col-span-full text-center py-12">
-            <p className="text-muted-foreground">No chefs found matching your criteria.</p>
-          </div>
-        ) : (
-          chefs?.map((chef) => <ChefCard key={chef.id} {...chef} />)
-        )}
-      </div>
+      <ChefGrid chefs={chefs} isLoading={isLoading} />
     </div>
   );
 };
