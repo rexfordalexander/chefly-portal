@@ -144,6 +144,7 @@ export type Database = {
           hourly_rate: number | null
           id: string
           location: string | null
+          payment_info: Json | null
           price_range: number[] | null
           rating: number | null
           specialties: string[] | null
@@ -162,6 +163,7 @@ export type Database = {
           hourly_rate?: number | null
           id: string
           location?: string | null
+          payment_info?: Json | null
           price_range?: number[] | null
           rating?: number | null
           specialties?: string[] | null
@@ -180,6 +182,7 @@ export type Database = {
           hourly_rate?: number | null
           id?: string
           location?: string | null
+          payment_info?: Json | null
           price_range?: number[] | null
           rating?: number | null
           specialties?: string[] | null
