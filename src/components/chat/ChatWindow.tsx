@@ -5,17 +5,18 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-interface Message {
+type Message = {
   id: string;
   content: string;
   sender_id: string;
   created_at: string;
   sender: {
-    first_name: string;
-    last_name: string;
+    first_name: string | null;
+    last_name: string | null;
   };
-}
+};
 
 interface ChatWindowProps {
   bookingId: string;
@@ -39,22 +40,24 @@ export const ChatWindow = ({ bookingId, customerId, chefId }: ChatWindowProps) =
   useEffect(() => {
     // Fetch existing messages
     const fetchMessages = async () => {
-      const { data } = await supabase
-        .from('booking_messages')
+      const { data, error } = await supabase
+        .from("booking_messages")
         .select(`
           id,
           content,
           sender_id,
           created_at,
-          profiles:sender_id (
+          sender:profiles!booking_messages_sender_id_fkey (
             first_name,
             last_name
           )
         `)
-        .eq('booking_id', bookingId)
-        .order('created_at', { ascending: true });
+        .eq("booking_id", bookingId)
+        .order("created_at", { ascending: true });
 
-      if (data) setMessages(data as Message[]);
+      if (!error && data) {
+        setMessages(data as Message[]);
+      }
     };
 
     fetchMessages();
@@ -63,31 +66,31 @@ export const ChatWindow = ({ bookingId, customerId, chefId }: ChatWindowProps) =
     const channel = supabase
       .channel(`booking-${bookingId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'booking_messages',
+          event: "INSERT",
+          schema: "public",
+          table: "booking_messages",
           filter: `booking_id=eq.${bookingId}`
         },
         async (payload) => {
-          const { data: newMessage } = await supabase
-            .from('booking_messages')
+          const { data, error } = await supabase
+            .from("booking_messages")
             .select(`
               id,
               content,
               sender_id,
               created_at,
-              profiles:sender_id (
+              sender:profiles!booking_messages_sender_id_fkey (
                 first_name,
                 last_name
               )
             `)
-            .eq('id', payload.new.id)
+            .eq("id", payload.new.id)
             .single();
 
-          if (newMessage) {
-            setMessages(prev => [...prev, newMessage as Message]);
+          if (!error && data) {
+            setMessages(prev => [...prev, data as Message]);
           }
         }
       )
@@ -103,7 +106,7 @@ export const ChatWindow = ({ bookingId, customerId, chefId }: ChatWindowProps) =
     if (!newMessage.trim()) return;
 
     const { error } = await supabase
-      .from('booking_messages')
+      .from("booking_messages")
       .insert({
         booking_id: bookingId,
         content: newMessage.trim(),
