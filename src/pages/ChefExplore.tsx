@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChefCard } from "@/components/ChefCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,14 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Slider
-} from "@/components/ui/slider";
-import {
-  Search,
-  SlidersHorizontal,
-  X
-} from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -25,7 +19,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Chef {
@@ -50,6 +44,7 @@ const ChefExplore = () => {
   const [selectedCuisine, setSelectedCuisine] = useState<string>("");
   const [priceRange, setPriceRange] = useState([0, 500]);
   const [minRating, setMinRating] = useState(0);
+  const queryClient = useQueryClient();
 
   // Fetch cuisine types
   const { data: cuisineTypes } = useQuery<CuisineType[]>({
@@ -83,7 +78,7 @@ const ChefExplore = () => {
             avatar_url
           )
         `)
-        .eq('status', 'approved') // Only show approved chefs
+        .eq('status', 'approved')
         .order('rating', { ascending: false });
 
       if (selectedCuisine) {
@@ -123,6 +118,29 @@ const ChefExplore = () => {
       })) as Chef[];
     }
   });
+
+  // Subscribe to real-time updates for chef_profiles
+  useEffect(() => {
+    const channel = supabase
+      .channel('chef-profiles-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chef_profiles',
+          filter: `status=eq.approved`
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["chefs"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   return (
     <div className="container py-20">

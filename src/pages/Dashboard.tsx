@@ -1,11 +1,10 @@
-
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChefHat, Clock, DollarSign, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 
 interface Order {
@@ -34,8 +33,8 @@ const Dashboard = () => {
   const { toast } = useToast();
   const [isChef, setIsChef] = useState(false);
   const [user, setUser] = useState(null);
+  const queryClient = useQueryClient();
 
-  // Get current user and check if they're a chef
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
@@ -52,7 +51,6 @@ const Dashboard = () => {
     });
   }, []);
 
-  // Fetch chef stats
   const { data: stats } = useQuery<Stats>({
     queryKey: ["chef-stats", user?.id],
     enabled: !!user && isChef,
@@ -81,7 +79,6 @@ const Dashboard = () => {
     }
   });
 
-  // Fetch orders
   const { data: orders } = useQuery<Order[]>({
     queryKey: ["chef-orders", user?.id],
     enabled: !!user && isChef,
@@ -103,7 +100,6 @@ const Dashboard = () => {
     }
   });
 
-  // Listen for new bookings
   useEffect(() => {
     if (!user?.id || !isChef) return;
 
@@ -118,7 +114,6 @@ const Dashboard = () => {
           filter: `chef_id=eq.${user.id}`
         },
         () => {
-          // Invalidate queries to refresh the data
           queryClient.invalidateQueries({ queryKey: ["chef-orders"] });
           queryClient.invalidateQueries({ queryKey: ["chef-stats"] });
         }
@@ -128,7 +123,7 @@ const Dashboard = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, isChef]);
+  }, [user?.id, isChef, queryClient]);
 
   const handleAcceptOrder = async (orderId: string) => {
     try {
