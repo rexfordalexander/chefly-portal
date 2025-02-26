@@ -1,9 +1,18 @@
+
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChefHat, Menu, User, X } from "lucide-react";
+import { ChefHat, Menu, User, X, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -11,21 +20,79 @@ export const Navigation = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [user, setUser] = useState(null);
+  const [notifications, setNotifications] = useState(0);
 
   // Check auth state
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    setUser(session?.user ?? null);
-  });
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
 
-  supabase.auth.onAuthStateChange((_event, session) => {
-    setUser(session?.user ?? null);
-  });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Check for notifications
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchNotifications = async () => {
+      const { data: bookingData } = await supabase
+        .from('bookings')
+        .select('status, id')
+        .or('customer_id.eq.' + user.id + ',chef_id.eq.' + user.id)
+        .in('status', ['confirmed', 'cancelled']);
+      
+      if (bookingData) {
+        setNotifications(bookingData.length);
+      }
+    };
+
+    fetchNotifications();
+
+    // Subscribe to booking changes
+    const channel = supabase
+      .channel('booking-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'bookings',
+          filter: `customer_id=eq.${user.id}`
+        },
+        (payload) => {
+          const newStatus = payload.new.status;
+          if (newStatus === 'confirmed' || newStatus === 'cancelled') {
+            toast({
+              title: `Booking ${newStatus}`,
+              description: `Your booking has been ${newStatus}.`,
+            });
+            setNotifications(prev => prev + 1);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, toast]);
 
   const handleSignOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       navigate("/");
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully.",
+      });
     } catch (error) {
       toast({
         variant: "destructive",
@@ -41,6 +108,10 @@ export const Navigation = () => {
     ...(user ? [{ href: "/dashboard", label: "Dashboard" }] : []),
   ];
 
+  const clearNotifications = () => {
+    setNotifications(0);
+  };
+
   return (
     <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -53,7 +124,7 @@ export const Navigation = () => {
           </div>
 
           {/* Desktop navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-4 lg:space-x-8">
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -68,9 +139,51 @@ export const Navigation = () => {
               </Link>
             ))}
             {user ? (
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                Sign Out
-              </Button>
+              <div className="flex items-center space-x-4">
+                {notifications > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="relative">
+                        <Bell className="h-5 w-5" />
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+                          {notifications}
+                        </span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                        You have {notifications} new notification{notifications > 1 ? 's' : ''}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={clearNotifications}>
+                        Mark all as read
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2">
+                      <User className="h-4 w-4" />
+                      Account
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                      Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ) : (
               <Button variant="outline" size="sm" onClick={() => navigate("/auth/signin")}>
                 <User className="h-4 w-4 mr-2" />
@@ -81,6 +194,14 @@ export const Navigation = () => {
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
+            {user && notifications > 0 && (
+              <Button variant="ghost" size="icon" className="relative mr-2" onClick={() => navigate('/dashboard')}>
+                <Bell className="h-5 w-5" />
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+                  {notifications}
+                </span>
+              </Button>
+            )}
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="inline-flex items-center justify-center p-2 rounded-md text-primary hover:text-accent focus:outline-none"
@@ -114,9 +235,11 @@ export const Navigation = () => {
               </Link>
             ))}
             {user ? (
-              <Button variant="outline" size="sm" onClick={handleSignOut} className="w-full mt-4">
-                Sign Out
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={handleSignOut} className="w-full mt-4">
+                  Sign Out
+                </Button>
+              </>
             ) : (
               <Button variant="outline" size="sm" className="w-full mt-4" onClick={() => navigate("/auth/signin")}>
                 <User className="h-4 w-4 mr-2" />
