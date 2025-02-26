@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -6,6 +7,7 @@ import { ChefHat, Clock, DollarSign, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
+import { PaymentWithdrawal } from "@/components/chef/PaymentWithdrawal";
 
 interface Order {
   id: string;
@@ -147,6 +149,78 @@ const Dashboard = () => {
     }
   };
 
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      const { error } = await supabase
+        .from("bookings")
+        .update({ status: "cancelled" })
+        .eq("id", orderId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Order cancelled",
+        description: "The booking has been cancelled.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to cancel the booking.",
+      });
+    }
+  };
+
+  const handleCompleteOrder = async (orderId: string) => {
+    try {
+      const { error } = await supabase
+        .from("bookings")
+        .update({ status: "completed" })
+        .eq("id", orderId);
+
+      if (error) throw error;
+
+      // Update chef's available balance
+      const { data: booking } = await supabase
+        .from("bookings")
+        .select("total_amount")
+        .eq("id", orderId)
+        .single();
+
+      if (booking) {
+        const { data: chefData } = await supabase
+          .from("chef_profiles")
+          .select("payment_info")
+          .eq("id", user.id)
+          .single();
+
+        const paymentInfo = chefData?.payment_info || {};
+        const currentBalance = paymentInfo.available_balance || 0;
+        
+        await supabase
+          .from("chef_profiles")
+          .update({
+            payment_info: {
+              ...paymentInfo,
+              available_balance: currentBalance + booking.total_amount,
+            }
+          })
+          .eq("id", user.id);
+      }
+
+      toast({
+        title: "Order completed",
+        description: "The booking has been marked as completed.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to complete the booking.",
+      });
+    }
+  };
+
   if (!isChef) {
     return (
       <div className="container py-20">
@@ -218,8 +292,8 @@ const Dashboard = () => {
         <Tabs defaultValue="orders" className="w-full">
           <TabsList>
             <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
           <TabsContent value="orders" className="mt-6">
             <Card className="p-6">
@@ -246,16 +320,43 @@ const Dashboard = () => {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium capitalize">{order.status}</span>
-                      {order.status === "pending" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAcceptOrder(order.id)}
-                        >
-                          Accept
-                        </Button>
-                      )}
+                      <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                        order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                        order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                        order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      </span>
+                      <div className="flex gap-2">
+                        {order.status === "pending" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAcceptOrder(order.id)}
+                          >
+                            Accept
+                          </Button>
+                        )}
+                        {(order.status === "pending" || order.status === "confirmed") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancelOrder(order.id)}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                        {order.status === "confirmed" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCompleteOrder(order.id)}
+                          >
+                            Complete
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -265,16 +366,13 @@ const Dashboard = () => {
               </div>
             </Card>
           </TabsContent>
+          <TabsContent value="payments" className="mt-6">
+            <PaymentWithdrawal />
+          </TabsContent>
           <TabsContent value="profile" className="mt-6">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Profile Settings</h3>
               {/* Add profile settings form here */}
-            </Card>
-          </TabsContent>
-          <TabsContent value="payments" className="mt-6">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Payment Methods</h3>
-              {/* Add payment methods here */}
             </Card>
           </TabsContent>
         </Tabs>
