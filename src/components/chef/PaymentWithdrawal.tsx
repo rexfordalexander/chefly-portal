@@ -22,6 +22,13 @@ interface PaymentMethod {
   supportedCountries: string[];
 }
 
+interface PaymentInfo {
+  available_balance?: number;
+  country?: string;
+  saved_methods?: any[];
+  withdrawals?: any[];
+}
+
 const paymentMethods: PaymentMethod[] = [
   {
     id: "bank_transfer",
@@ -115,6 +122,7 @@ export const PaymentWithdrawal = () => {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [withdrawalAmount, setWithdrawalAmount] = useState<string>("");
   const [savedMethods, setSavedMethods] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
 
   useEffect(() => {
     // Reset form when method changes
@@ -134,12 +142,14 @@ export const PaymentWithdrawal = () => {
           .single();
         
         if (chefData?.payment_info) {
-          setAvailableAmount(chefData.payment_info.available_balance || 0);
-          setSavedMethods(chefData.payment_info.saved_methods || []);
+          const paymentInfo = chefData.payment_info as PaymentInfo;
+          setAvailableAmount(paymentInfo.available_balance || 0);
+          setSavedMethods(paymentInfo.saved_methods || []);
+          setWithdrawals(paymentInfo.withdrawals || []);
           
           // Set country if already saved
-          if (chefData.payment_info.country) {
-            setCountry(chefData.payment_info.country);
+          if (paymentInfo.country) {
+            setCountry(paymentInfo.country);
           }
         }
       }
@@ -195,6 +205,7 @@ export const PaymentWithdrawal = () => {
             available_balance: availableAmount,
             country,
             saved_methods: [...savedMethods, newMethod],
+            withdrawals: withdrawals || [],
           }
         })
         .eq("id", user.id);
@@ -261,6 +272,14 @@ export const PaymentWithdrawal = () => {
       }
 
       const newBalance = availableAmount - parseFloat(withdrawalAmount);
+      const newWithdrawal = {
+        amount: parseFloat(withdrawalAmount),
+        method: savedMethods[0].type,
+        status: "processing",
+        requestedAt: new Date().toISOString(),
+      };
+      
+      const updatedWithdrawals = withdrawals ? [...withdrawals, newWithdrawal] : [newWithdrawal];
       
       const { error } = await supabase
         .from("chef_profiles")
@@ -269,15 +288,7 @@ export const PaymentWithdrawal = () => {
             available_balance: newBalance,
             country,
             saved_methods: savedMethods,
-            withdrawals: [
-              ...(savedMethods.withdrawals || []),
-              {
-                amount: parseFloat(withdrawalAmount),
-                method: savedMethods[0].type,
-                status: "processing",
-                requestedAt: new Date().toISOString(),
-              }
-            ]
+            withdrawals: updatedWithdrawals
           }
         })
         .eq("id", user.id);
@@ -286,6 +297,7 @@ export const PaymentWithdrawal = () => {
 
       setAvailableAmount(newBalance);
       setWithdrawalAmount("");
+      setWithdrawals(updatedWithdrawals);
       
       toast({
         title: "Withdrawal requested",

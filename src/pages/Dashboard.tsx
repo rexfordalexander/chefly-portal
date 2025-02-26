@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChefHat, Clock, DollarSign, Users } from "lucide-react";
+import { ChefHat, Clock, DollarSign, Users, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { PaymentWithdrawal } from "@/components/chef/PaymentWithdrawal";
+import { Link, useNavigate } from "react-router-dom";
 
 interface Order {
   id: string;
@@ -31,11 +32,19 @@ interface Stats {
   rating: number;
 }
 
+interface PaymentInfo {
+  available_balance?: number;
+  country?: string;
+  saved_methods?: any[];
+  withdrawals?: any[];
+}
+
 const Dashboard = () => {
   const { toast } = useToast();
   const [isChef, setIsChef] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -194,18 +203,20 @@ const Dashboard = () => {
           .eq("id", user.id)
           .single();
 
-        const paymentInfo = chefData?.payment_info || {};
-        const currentBalance = paymentInfo.available_balance || 0;
-        
-        await supabase
-          .from("chef_profiles")
-          .update({
-            payment_info: {
-              ...paymentInfo,
-              available_balance: currentBalance + booking.total_amount,
-            }
-          })
-          .eq("id", user.id);
+        if (chefData) {
+          const paymentInfo = chefData.payment_info as PaymentInfo || {};
+          const currentBalance = paymentInfo.available_balance || 0;
+          
+          await supabase
+            .from("chef_profiles")
+            .update({
+              payment_info: {
+                ...(typeof paymentInfo === 'object' ? paymentInfo : {}),
+                available_balance: currentBalance + booking.total_amount,
+              }
+            })
+            .eq("id", user.id);
+        }
       }
 
       toast({
@@ -223,23 +234,41 @@ const Dashboard = () => {
 
   if (!isChef) {
     return (
-      <div className="container py-20">
+      <div className="container py-12 md:py-20">
         <div className="text-center">
           <h1 className="text-4xl font-display font-bold mb-4">Customer Dashboard</h1>
           <p className="text-muted-foreground">View your bookings and manage your profile</p>
+          <div className="mt-8">
+            <Button asChild>
+              <Link to="/explore">Find a Chef</Link>
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container py-20">
-      <div className="flex flex-col gap-8">
-        <div>
-          <h1 className="text-4xl font-display font-bold mb-2">Chef Dashboard</h1>
-          <p className="text-muted-foreground">
-            Manage your profile, orders, and availability
-          </p>
+    <div className="container py-6 md:py-20">
+      <div className="flex flex-col gap-6 md:gap-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div>
+            <Button variant="outline" className="mb-4" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back
+            </Button>
+            <h1 className="text-3xl md:text-4xl font-display font-bold mb-2">Chef Dashboard</h1>
+            <p className="text-muted-foreground">
+              Manage your profile, orders, and availability
+            </p>
+          </div>
+          <div className="flex mt-4 md:mt-0 gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/explore">Browse Chefs</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/">Home</Link>
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -290,18 +319,18 @@ const Dashboard = () => {
         </div>
 
         <Tabs defaultValue="orders" className="w-full">
-          <TabsList>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsList className="w-full md:w-auto">
+            <TabsTrigger value="orders" className="flex-1 md:flex-none">Orders</TabsTrigger>
+            <TabsTrigger value="payments" className="flex-1 md:flex-none">Payments</TabsTrigger>
+            <TabsTrigger value="profile" className="flex-1 md:flex-none">Profile</TabsTrigger>
           </TabsList>
           <TabsContent value="orders" className="mt-6">
-            <Card className="p-6">
+            <Card className="p-4 md:p-6">
               <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
               <div className="space-y-4">
                 {orders?.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-4 bg-secondary rounded-lg">
-                    <div>
+                  <div key={order.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-secondary rounded-lg">
+                    <div className="mb-3 md:mb-0">
                       <p className="font-medium">
                         Booking for {order.number_of_guests} guests
                       </p>
@@ -319,7 +348,7 @@ const Dashboard = () => {
                         ${order.total_amount} • {order.duration_hours} hours
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
                       <span className={`text-sm font-medium px-2 py-1 rounded-full ${
                         order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
                         order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
@@ -328,7 +357,7 @@ const Dashboard = () => {
                       }`}>
                         {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                       </span>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 mt-2 md:mt-0">
                         {order.status === "pending" && (
                           <Button
                             variant="outline"
@@ -372,7 +401,10 @@ const Dashboard = () => {
           <TabsContent value="profile" className="mt-6">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Profile Settings</h3>
-              {/* Add profile settings form here */}
+              <div className="text-center">
+                <p className="text-muted-foreground mb-4">Update your profile information and preferences</p>
+                <Button>Edit Profile</Button>
+              </div>
             </Card>
           </TabsContent>
         </Tabs>
