@@ -19,7 +19,7 @@ const Index = () => {
                   </h1>
                   <p className="max-w-[600px] text-gray-500 md:text-xl dark:text-gray-400">
                     Connect with professional chefs or showcase your culinary
-                    skills. Experience personalized dining like never before.
+                    skills with delizofare. Experience personalized dining like never before.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">

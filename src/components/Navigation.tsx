@@ -119,7 +119,7 @@ export const Navigation = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
               <ChefHat className="h-8 w-8 text-accent" />
-              <span className="font-display text-xl">ChefPortal</span>
+              <span className="font-display text-xl">delizofare</span>
             </Link>
           </div>
 
