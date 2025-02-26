@@ -5,6 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { SearchBar } from "@/components/chef/SearchBar";
 import { FiltersSheet } from "@/components/chef/FiltersSheet";
 import { ChefGrid } from "@/components/chef/ChefGrid";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
 
 interface Chef {
   id: string;
@@ -15,6 +20,10 @@ interface Chef {
   specialty: string;
   price: number;
   cuisines: string[];
+  dietary_accommodations?: string[];
+  specializations?: string[];
+  years_of_experience?: number;
+  availability?: any;
 }
 
 interface CuisineType {
@@ -23,11 +32,25 @@ interface CuisineType {
   created_at: string;
 }
 
+interface DietaryRestriction {
+  id: string;
+  name: string;
+}
+
+interface Specialization {
+  id: string;
+  name: string;
+}
+
 const ChefExplore = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState<string>("");
   const [priceRange, setPriceRange] = useState([0, 500]);
   const [minRating, setMinRating] = useState(0);
+  const [selectedDietaryRestrictions, setSelectedDietaryRestrictions] = useState<string[]>([]);
+  const [selectedSpecializations, setSelectedSpecializations] = useState<string[]>([]);
+  const [yearsOfExperience, setYearsOfExperience] = useState(0);
+  const [availableDate, setAvailableDate] = useState("");
   const queryClient = useQueryClient();
 
   // Fetch cuisine types
@@ -43,9 +66,52 @@ const ChefExplore = () => {
     }
   });
 
+  // Fetch dietary restrictions
+  const { data: dietaryRestrictions } = useQuery<DietaryRestriction[]>({
+    queryKey: ['dietaryRestrictions'],
+    queryFn: async () => {
+      // Mock data for demonstration - replace with actual API call when available
+      return [
+        { id: "gluten-free", name: "Gluten-Free" },
+        { id: "vegan", name: "Vegan" },
+        { id: "vegetarian", name: "Vegetarian" },
+        { id: "keto", name: "Keto" },
+        { id: "paleo", name: "Paleo" },
+        { id: "dairy-free", name: "Dairy-Free" },
+        { id: "nut-free", name: "Nut-Free" }
+      ];
+    }
+  });
+
+  // Fetch specializations
+  const { data: specializations } = useQuery<Specialization[]>({
+    queryKey: ['specializations'],
+    queryFn: async () => {
+      // Mock data for demonstration - replace with actual API call when available
+      return [
+        { id: "baking", name: "Baking" },
+        { id: "grilling", name: "Grilling" },
+        { id: "sushi", name: "Sushi Making" },
+        { id: "pastry", name: "Pastry" },
+        { id: "molecular", name: "Molecular Gastronomy" },
+        { id: "farm-to-table", name: "Farm-to-Table" }
+      ];
+    }
+  });
+
   // Fetch chefs with filters
   const { data: chefs, isLoading } = useQuery<Chef[]>({
-    queryKey: ['chefs', selectedCuisine, priceRange, minRating, searchQuery],
+    queryKey: [
+      'chefs', 
+      selectedCuisine, 
+      priceRange, 
+      minRating, 
+      searchQuery, 
+      selectedDietaryRestrictions,
+      selectedSpecializations,
+      yearsOfExperience,
+      availableDate
+    ],
     queryFn: async () => {
       let query = supabase
         .from('chef_profiles')
@@ -56,6 +122,9 @@ const ChefExplore = () => {
           rating,
           specialties,
           cuisine_types,
+          years_of_experience,
+          availability,
+          dietary_accommodations,
           profiles!inner (
             first_name,
             last_name,
@@ -79,11 +148,32 @@ const ChefExplore = () => {
         query = query.gte('rating', minRating);
       }
 
+      if (yearsOfExperience > 0) {
+        query = query.gte('years_of_experience', yearsOfExperience);
+      }
+
       if (searchQuery) {
         query = query.or(`
           location.ilike.%${searchQuery}%,
           specialties.ilike.%${searchQuery}%
         `);
+      }
+
+      // Filter by dietary accommodations if selected
+      if (selectedDietaryRestrictions.length > 0) {
+        query = query.contains('dietary_accommodations', selectedDietaryRestrictions);
+      }
+
+      // Filter by specializations if selected
+      if (selectedSpecializations.length > 0) {
+        query = query.overlaps('specialties', selectedSpecializations);
+      }
+
+      // Filter by availability if date is selected
+      if (availableDate) {
+        // This is a simplified approach - in real application, you'd need more complex logic
+        // to check chef's availability based on the selected date
+        query = query.not('availability', 'is', null);
       }
 
       const { data, error } = await query;
@@ -98,7 +188,11 @@ const ChefExplore = () => {
         location: chef.location || 'Location not specified',
         specialty: chef.specialties?.[0] || 'Various Cuisines',
         price: chef.hourly_rate || 0,
-        cuisines: chef.cuisine_types || []
+        cuisines: chef.cuisine_types || [],
+        dietary_accommodations: chef.dietary_accommodations || [],
+        specializations: chef.specialties || [],
+        years_of_experience: chef.years_of_experience || 0,
+        availability: chef.availability || {}
       })) as Chef[];
     }
   });
@@ -130,6 +224,10 @@ const ChefExplore = () => {
     setSelectedCuisine("");
     setMinRating(0);
     setPriceRange([0, 500]);
+    setSelectedDietaryRestrictions([]);
+    setSelectedSpecializations([]);
+    setYearsOfExperience(0);
+    setAvailableDate("");
   };
 
   return (
@@ -150,6 +248,16 @@ const ChefExplore = () => {
             minRating={minRating}
             onMinRatingChange={setMinRating}
             onClearFilters={handleClearFilters}
+            dietaryRestrictions={dietaryRestrictions || []}
+            selectedDietaryRestrictions={selectedDietaryRestrictions}
+            onDietaryRestrictionChange={setSelectedDietaryRestrictions}
+            specializations={specializations || []}
+            selectedSpecializations={selectedSpecializations}
+            onSpecializationChange={setSelectedSpecializations}
+            yearsOfExperience={yearsOfExperience}
+            onYearsOfExperienceChange={setYearsOfExperience}
+            availableDate={availableDate}
+            onAvailableDateChange={setAvailableDate}
           />
         </div>
       </div>
