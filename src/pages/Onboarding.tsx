@@ -14,9 +14,32 @@ const Onboarding = () => {
   const [bio, setBio] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [specialties, setSpecialties] = useState("");
+  const [location, setLocation] = useState("");
+  const [cuisineTypes, setCuisineTypes] = useState<string[]>([]);
+  const [yearsOfExperience, setYearsOfExperience] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const cuisineOptions = [
+    { value: "italian", label: "Italian" },
+    { value: "french", label: "French" },
+    { value: "indian", label: "Indian" },
+    { value: "chinese", label: "Chinese" },
+    { value: "japanese", label: "Japanese" },
+    { value: "mexican", label: "Mexican" },
+    { value: "mediterranean", label: "Mediterranean" },
+    { value: "american", label: "American" },
+    { value: "other", label: "Other" }
+  ];
+
+  const handleCuisineToggle = (cuisine: string) => {
+    setCuisineTypes(prev => 
+      prev.includes(cuisine) 
+        ? prev.filter(c => c !== cuisine) 
+        : [...prev, cuisine]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,13 +48,23 @@ const Onboarding = () => {
     setIsLoading(true);
 
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("User not found. Please log in again.");
+      }
+
       if (isChef) {
         const { error } = await supabase.from("chef_profiles").insert({
-          id: (await supabase.auth.getUser()).data.user?.id,
+          id: user.id,
           payment_info: { type: "upi", value: paymentInfo },
           bio,
           hourly_rate: parseFloat(hourlyRate),
           specialties: specialties.split(",").map(s => s.trim()),
+          cuisine_types: cuisineTypes,
+          location,
+          years_of_experience: parseInt(yearsOfExperience),
           status: "pending"
         });
 
@@ -78,7 +111,10 @@ const Onboarding = () => {
             size="lg"
             variant="outline"
             className="h-32"
-            onClick={() => navigate("/explore")}
+            onClick={() => {
+              setIsChef(false);
+              navigate("/explore");
+            }}
           >
             <div className="flex flex-col items-center gap-2">
               <Utensils className="h-8 w-8" />
@@ -98,6 +134,15 @@ const Onboarding = () => {
       </div>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
+          <label className="text-sm font-medium">Location</label>
+          <Input
+            placeholder="Where are you based?"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-2">
           <label className="text-sm font-medium">Payment Information (UPI ID)</label>
           <Input
             placeholder="Enter your UPI ID"
@@ -116,6 +161,17 @@ const Onboarding = () => {
           />
         </div>
         <div className="space-y-2">
+          <label className="text-sm font-medium">Years of Experience</label>
+          <Input
+            type="number"
+            min="0"
+            placeholder="How many years have you been cooking professionally?"
+            value={yearsOfExperience}
+            onChange={(e) => setYearsOfExperience(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-2">
           <label className="text-sm font-medium">Hourly Rate ($)</label>
           <Input
             type="number"
@@ -126,6 +182,22 @@ const Onboarding = () => {
             onChange={(e) => setHourlyRate(e.target.value)}
             required
           />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Cuisine Types</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {cuisineOptions.map((cuisine) => (
+              <Button
+                key={cuisine.value}
+                type="button"
+                variant={cuisineTypes.includes(cuisine.value) ? "default" : "outline"}
+                className="text-sm"
+                onClick={() => handleCuisineToggle(cuisine.value)}
+              >
+                {cuisine.label}
+              </Button>
+            ))}
+          </div>
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Specialties</label>
