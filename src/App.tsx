@@ -16,7 +16,7 @@ function App() {
   return (
     <>
       <Navigation />
-      <main>
+      <main className="min-h-screen pt-16">
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<Dashboard />} />

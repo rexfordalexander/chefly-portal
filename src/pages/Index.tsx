@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col">
       <main className="flex-1">
         <section className="relative py-20 md:py-32">
           <div className="container px-4 md:px-6">
