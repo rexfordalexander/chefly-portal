@@ -111,18 +111,16 @@ const ChefExplore = () => {
         // Create a sample chef profile for testing if needed
         const { error: insertError } = await supabase
           .from('chef_profiles')
-          .upsert([
-            {
-              id: '123e4567-e89b-12d3-a456-426614174000',
-              hourly_rate: 100,
-              location: 'New York',
-              rating: 4.5,
-              specialties: ['Italian', 'French'],
-              cuisine_types: ['Italian', 'French'],
-              years_of_experience: 10,
-              status: 'approved'
-            }
-          ], { onConflict: 'id' });
+          .upsert({
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            hourly_rate: 100,
+            location: 'New York',
+            rating: 4.5,
+            specialties: ['Italian', 'French'],
+            cuisine_types: ['italian', 'french'],
+            years_of_experience: 10,
+            status: 'approved'
+          }, { onConflict: 'id' });
           
         if (insertError) {
           console.log("Error creating sample chef profile:", insertError);
@@ -131,14 +129,12 @@ const ChefExplore = () => {
         // Create a sample profile for the chef if needed
         const { error: profileError } = await supabase
           .from('profiles')
-          .upsert([
-            {
-              id: '123e4567-e89b-12d3-a456-426614174000',
-              first_name: 'John',
-              last_name: 'Doe',
-              avatar_url: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80'
-            }
-          ], { onConflict: 'id' });
+          .upsert({
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            first_name: 'John',
+            last_name: 'Doe',
+            avatar_url: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80'
+          }, { onConflict: 'id' });
           
         if (profileError) {
           console.log("Error creating sample profile:", profileError);
