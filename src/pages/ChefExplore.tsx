@@ -5,11 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { SearchBar } from "@/components/chef/SearchBar";
 import { FiltersSheet } from "@/components/chef/FiltersSheet";
 import { ChefGrid } from "@/components/chef/ChefGrid";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
 
 interface Chef {
   id: string;
@@ -20,10 +15,6 @@ interface Chef {
   specialty: string;
   price: number;
   cuisines: string[];
-  dietary_accommodations?: string[];
-  specializations?: string[];
-  years_of_experience?: number;
-  availability?: any;
 }
 
 interface CuisineType {
@@ -107,7 +98,6 @@ const ChefExplore = () => {
       priceRange, 
       minRating, 
       searchQuery, 
-      selectedDietaryRestrictions,
       selectedSpecializations,
       yearsOfExperience,
       availableDate
@@ -124,16 +114,14 @@ const ChefExplore = () => {
           cuisine_types,
           years_of_experience,
           availability,
-          dietary_accommodations,
           profiles!inner (
             first_name,
             last_name,
             avatar_url
           )
-        `)
-        .eq('status', 'approved')
-        .order('rating', { ascending: false });
+        `);
 
+      // Apply filters
       if (selectedCuisine) {
         query = query.contains('cuisine_types', [selectedCuisine]);
       }
@@ -159,11 +147,6 @@ const ChefExplore = () => {
         `);
       }
 
-      // Filter by dietary accommodations if selected
-      if (selectedDietaryRestrictions.length > 0) {
-        query = query.contains('dietary_accommodations', selectedDietaryRestrictions);
-      }
-
       // Filter by specializations if selected
       if (selectedSpecializations.length > 0) {
         query = query.overlaps('specialties', selectedSpecializations);
@@ -176,24 +159,32 @@ const ChefExplore = () => {
         query = query.not('availability', 'is', null);
       }
 
+      // Add status filter and ordering
+      query = query.eq('status', 'approved')
+                   .order('rating', { ascending: false });
+
       const { data, error } = await query;
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching chefs:", error);
+        throw error;
+      }
       
-      return data?.map(chef => ({
+      if (!data || data.length === 0) {
+        console.log("No chefs found with the current filters");
+        return [];
+      }
+
+      return data.map(chef => ({
         id: chef.id,
-        name: `${chef.profiles.first_name} ${chef.profiles.last_name}`,
+        name: `${chef.profiles.first_name || 'Chef'} ${chef.profiles.last_name || ''}`,
         image: chef.profiles.avatar_url || 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80',
         rating: chef.rating || 0,
         location: chef.location || 'Location not specified',
         specialty: chef.specialties?.[0] || 'Various Cuisines',
         price: chef.hourly_rate || 0,
-        cuisines: chef.cuisine_types || [],
-        dietary_accommodations: chef.dietary_accommodations || [],
-        specializations: chef.specialties || [],
-        years_of_experience: chef.years_of_experience || 0,
-        availability: chef.availability || {}
-      })) as Chef[];
+        cuisines: chef.cuisine_types || []
+      }));
     }
   });
 
