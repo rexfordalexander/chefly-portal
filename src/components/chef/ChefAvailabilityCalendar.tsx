@@ -73,4 +73,55 @@ export const ChefAvailabilityCalendar = ({
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
-              
+              selected={date}
+              onSelect={handleDateSelect}
+              disabled={(date) => {
+                // Disable dates that aren't in availableDates
+                return !availableDates.some(
+                  (d) => format(d, "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
+                );
+              }}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {date && (
+        <>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Available Times</label>
+            <div className="grid grid-cols-3 gap-2">
+              {getAvailableTimesForDate().length > 0 ? (
+                getAvailableTimesForDate().map((time) => (
+                  <Button
+                    key={time}
+                    type="button"
+                    variant={selectedTime === time ? "default" : "outline"}
+                    onClick={() => handleTimeSelect(time)}
+                    className="text-center"
+                  >
+                    {time}
+                  </Button>
+                ))
+              ) : (
+                <p className="col-span-3 text-sm text-muted-foreground">
+                  No available times for this date.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {selectedTime && (
+            <Button
+              onClick={handleConfirm}
+              className="w-full"
+            >
+              Confirm {format(date, "MMM d")} at {selectedTime}
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
