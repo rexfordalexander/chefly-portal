@@ -7,6 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { ChefHat, Utensils } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
+
+// Define the cuisine type to match the database enum
+type CuisineType = Database["public"]["Enums"]["cuisine_type"];
 
 const Onboarding = () => {
   const [isChef, setIsChef] = useState<boolean | null>(null);
@@ -15,25 +19,25 @@ const Onboarding = () => {
   const [hourlyRate, setHourlyRate] = useState("");
   const [specialties, setSpecialties] = useState("");
   const [location, setLocation] = useState("");
-  const [cuisineTypes, setCuisineTypes] = useState<string[]>([]);
+  const [cuisineTypes, setCuisineTypes] = useState<CuisineType[]>([]);
   const [yearsOfExperience, setYearsOfExperience] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const cuisineOptions = [
-    { value: "italian", label: "Italian" },
-    { value: "french", label: "French" },
-    { value: "indian", label: "Indian" },
-    { value: "chinese", label: "Chinese" },
-    { value: "japanese", label: "Japanese" },
-    { value: "mexican", label: "Mexican" },
-    { value: "mediterranean", label: "Mediterranean" },
-    { value: "american", label: "American" },
-    { value: "other", label: "Other" }
+    { value: "italian" as CuisineType, label: "Italian" },
+    { value: "french" as CuisineType, label: "French" },
+    { value: "indian" as CuisineType, label: "Indian" },
+    { value: "chinese" as CuisineType, label: "Chinese" },
+    { value: "japanese" as CuisineType, label: "Japanese" },
+    { value: "mexican" as CuisineType, label: "Mexican" },
+    { value: "mediterranean" as CuisineType, label: "Mediterranean" },
+    { value: "american" as CuisineType, label: "American" },
+    { value: "other" as CuisineType, label: "Other" }
   ];
 
-  const handleCuisineToggle = (cuisine: string) => {
+  const handleCuisineToggle = (cuisine: CuisineType) => {
     setCuisineTypes(prev => 
       prev.includes(cuisine) 
         ? prev.filter(c => c !== cuisine) 
