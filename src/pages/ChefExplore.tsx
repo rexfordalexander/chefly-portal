@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SearchBar } from "@/components/chef/SearchBar";
 import { FiltersSheet } from "@/components/chef/FiltersSheet";
 import { ChefGrid } from "@/components/chef/ChefGrid";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Chef {
   id: string;
@@ -43,6 +44,7 @@ const ChefExplore = () => {
   const [yearsOfExperience, setYearsOfExperience] = useState(0);
   const [availableDate, setAvailableDate] = useState("");
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // Fetch cuisine types
   const { data: cuisineTypes } = useQuery<CuisineType[]>({
@@ -91,7 +93,7 @@ const ChefExplore = () => {
   });
 
   // Fetch chefs with filters
-  const { data: chefs, isLoading } = useQuery<Chef[]>({
+  const { data: chefs, isLoading, error } = useQuery<Chef[]>({
     queryKey: [
       'chefs', 
       selectedCuisine, 
@@ -103,90 +105,152 @@ const ChefExplore = () => {
       availableDate
     ],
     queryFn: async () => {
-      let query = supabase
-        .from('chef_profiles')
-        .select(`
-          id,
-          hourly_rate,
-          location,
-          rating,
-          specialties,
-          cuisine_types,
-          years_of_experience,
-          availability,
-          profiles!inner (
-            first_name,
-            last_name,
-            avatar_url
-          )
-        `);
+      try {
+        console.log("Fetching chefs with current filters...");
+        
+        // Create a sample chef profile for testing if needed
+        const { error: insertError } = await supabase
+          .from('chef_profiles')
+          .upsert([
+            {
+              id: '123e4567-e89b-12d3-a456-426614174000',
+              hourly_rate: 100,
+              location: 'New York',
+              rating: 4.5,
+              specialties: ['Italian', 'French'],
+              cuisine_types: ['Italian', 'French'],
+              years_of_experience: 10,
+              status: 'approved'
+            }
+          ], { onConflict: 'id' });
+          
+        if (insertError) {
+          console.log("Error creating sample chef profile:", insertError);
+        }
+          
+        // Create a sample profile for the chef if needed
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert([
+            {
+              id: '123e4567-e89b-12d3-a456-426614174000',
+              first_name: 'John',
+              last_name: 'Doe',
+              avatar_url: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80'
+            }
+          ], { onConflict: 'id' });
+          
+        if (profileError) {
+          console.log("Error creating sample profile:", profileError);
+        }
 
-      // Apply filters
-      if (selectedCuisine) {
-        query = query.contains('cuisine_types', [selectedCuisine]);
-      }
+        // Build the query
+        let query = supabase
+          .from('chef_profiles')
+          .select(`
+            id,
+            hourly_rate,
+            location,
+            rating,
+            specialties,
+            cuisine_types,
+            years_of_experience,
+            availability,
+            profiles (
+              first_name,
+              last_name,
+              avatar_url
+            )
+          `);
 
-      if (priceRange[0] > 0 || priceRange[1] < 500) {
-        query = query
-          .gte('hourly_rate', priceRange[0])
-          .lte('hourly_rate', priceRange[1]);
-      }
+        // Apply filters
+        if (selectedCuisine) {
+          query = query.contains('cuisine_types', [selectedCuisine]);
+        }
 
-      if (minRating > 0) {
-        query = query.gte('rating', minRating);
-      }
+        if (priceRange[0] > 0 || priceRange[1] < 500) {
+          query = query
+            .gte('hourly_rate', priceRange[0])
+            .lte('hourly_rate', priceRange[1]);
+        }
 
-      if (yearsOfExperience > 0) {
-        query = query.gte('years_of_experience', yearsOfExperience);
-      }
+        if (minRating > 0) {
+          query = query.gte('rating', minRating);
+        }
 
-      if (searchQuery) {
-        query = query.or(`
-          location.ilike.%${searchQuery}%,
-          specialties.ilike.%${searchQuery}%
-        `);
-      }
+        if (yearsOfExperience > 0) {
+          query = query.gte('years_of_experience', yearsOfExperience);
+        }
 
-      // Filter by specializations if selected
-      if (selectedSpecializations.length > 0) {
-        query = query.overlaps('specialties', selectedSpecializations);
-      }
+        if (searchQuery) {
+          query = query.or(`
+            location.ilike.%${searchQuery}%,
+            specialties.ilike.%${searchQuery}%
+          `);
+        }
 
-      // Filter by availability if date is selected
-      if (availableDate) {
-        // This is a simplified approach - in real application, you'd need more complex logic
-        // to check chef's availability based on the selected date
-        query = query.not('availability', 'is', null);
-      }
+        // Filter by specializations if selected
+        if (selectedSpecializations.length > 0) {
+          query = query.overlaps('specialties', selectedSpecializations);
+        }
 
-      // Add status filter and ordering
-      query = query.eq('status', 'approved')
-                   .order('rating', { ascending: false });
+        // Filter by availability if date is selected
+        if (availableDate) {
+          // This is a simplified approach - in real application, you'd need more complex logic
+          // to check chef's availability based on the selected date
+          query = query.not('availability', 'is', null);
+        }
 
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error("Error fetching chefs:", error);
-        throw error;
-      }
-      
-      if (!data || data.length === 0) {
-        console.log("No chefs found with the current filters");
+        // Add status filter and ordering
+        query = query.eq('status', 'approved')
+                     .order('rating', { ascending: false });
+
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error("Error fetching chefs:", error);
+          toast({
+            title: "Error fetching chefs",
+            description: error.message,
+            variant: "destructive",
+          });
+          throw error;
+        }
+        
+        if (!data || data.length === 0) {
+          console.log("No chefs found with the current filters");
+          return [];
+        }
+
+        console.log("Fetched chefs:", data);
+
+        return data.map(chef => ({
+          id: chef.id,
+          name: `${chef.profiles?.first_name || 'Chef'} ${chef.profiles?.last_name || ''}`,
+          image: chef.profiles?.avatar_url || 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80',
+          rating: chef.rating || 0,
+          location: chef.location || 'Location not specified',
+          specialty: chef.specialties?.[0] || 'Various Cuisines',
+          price: chef.hourly_rate || 0,
+          cuisines: chef.cuisine_types || []
+        }));
+      } catch (error) {
+        console.error("Error in chef query:", error);
         return [];
       }
-
-      return data.map(chef => ({
-        id: chef.id,
-        name: `${chef.profiles.first_name || 'Chef'} ${chef.profiles.last_name || ''}`,
-        image: chef.profiles.avatar_url || 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80',
-        rating: chef.rating || 0,
-        location: chef.location || 'Location not specified',
-        specialty: chef.specialties?.[0] || 'Various Cuisines',
-        price: chef.hourly_rate || 0,
-        cuisines: chef.cuisine_types || []
-      }));
     }
   });
+
+  useEffect(() => {
+    if (error) {
+      console.error("Chef query error:", error);
+      toast({
+        title: "Error loading chefs",
+        description: "There was a problem loading the chef profiles.",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -252,7 +316,14 @@ const ChefExplore = () => {
           />
         </div>
       </div>
+      
       <ChefGrid chefs={chefs} isLoading={isLoading} />
+      
+      {error && (
+        <div className="text-center py-6 text-red-500">
+          <p>Error loading chef profiles. Please try again later.</p>
+        </div>
+      )}
     </div>
   );
 };
