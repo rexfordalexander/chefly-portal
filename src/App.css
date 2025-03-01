@@ -1,10 +1,12 @@
+
+/* Reset default padding that might be hiding content */
 #root {
-  max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
   text-align: center;
 }
 
+/* Keep other existing styles but modify them to ensure visibility */
 .logo {
   height: 6em;
   padding: 1.5em;

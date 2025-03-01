@@ -2,8 +2,13 @@
 import { ChefHat, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useEffect } from "react";
 
 const Index = () => {
+  useEffect(() => {
+    console.log("Index page rendered");
+  }, []);
+
   return (
     <div className="flex flex-col">
       <main className="flex-1">
