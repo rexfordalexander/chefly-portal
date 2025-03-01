@@ -1,254 +1,227 @@
 
 import { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChefHat, Menu, User, X, Bell } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "./ui/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ChefHat, Menu, X, User } from "lucide-react";
+import { useMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
 
-export const Navigation = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { toast } = useToast();
+const Navigation = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
-  const [notifications, setNotifications] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const navigate = useNavigate();
+  const isMobile = useMobile();
 
-  // Check auth state
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
+    const fetchUserAndProfile = async () => {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+        if (currentUser) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", currentUser.id)
+            .single();
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Check for notifications
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchNotifications = async () => {
-      const { data: bookingData } = await supabase
-        .from('bookings')
-        .select('status, id')
-        .or('customer_id.eq.' + user.id + ',chef_id.eq.' + user.id)
-        .in('status', ['confirmed', 'cancelled']);
-      
-      if (bookingData) {
-        setNotifications(bookingData.length);
+          setProfile(data);
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchNotifications();
+    fetchUserAndProfile();
 
-    // Subscribe to booking changes
-    const channel = supabase
-      .channel('booking-notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'bookings',
-          filter: `customer_id=eq.${user.id}`
-        },
-        (payload) => {
-          const newStatus = payload.new.status;
-          if (newStatus === 'confirmed' || newStatus === 'cancelled') {
-            toast({
-              title: `Booking ${newStatus}`,
-              description: `Your booking has been ${newStatus}.`,
-            });
-            setNotifications(prev => prev + 1);
-          }
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+
+          setProfile(data);
+        } else {
+          setProfile(null);
         }
-      )
-      .subscribe();
+      }
+    );
 
     return () => {
-      supabase.removeChannel(channel);
+      authListener.subscription.unsubscribe();
     };
-  }, [user, toast]);
+  }, []);
 
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      navigate("/");
-      toast({
-        title: "Signed out",
-        description: "You have been signed out successfully.",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to sign out.",
-      });
-    }
-  };
-
-  const links = [
-    { href: "/", label: "Home" },
-    { href: "/explore", label: "Explore Chefs" },
-    ...(user ? [{ href: "/dashboard", label: "Dashboard" }] : []),
-  ];
-
-  const clearNotifications = () => {
-    setNotifications(0);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/auth/signin");
   };
 
   return (
-    <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
-              <ChefHat className="h-8 w-8 text-accent" />
-              <span className="font-display text-xl">delizofare</span>
-            </Link>
-          </div>
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-16 items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
+            <ChefHat className="h-6 w-6" />
+            <span className="font-semibold">ChefHub</span>
+          </Link>
+        </div>
 
-          {/* Desktop navigation */}
-          <div className="hidden md:flex items-center space-x-4 lg:space-x-8">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                className={`text-sm font-medium transition-colors hover:text-accent ${
-                  location.pathname === link.href
-                    ? "text-accent"
-                    : "text-primary"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-            {user ? (
-              <div className="flex items-center space-x-4">
-                {notifications > 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="relative">
-                        <Bell className="h-5 w-5" />
-                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                          {notifications}
-                        </span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate('/dashboard')}>
-                        You have {notifications} new notification{notifications > 1 ? 's' : ''}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={clearNotifications}>
-                        Mark all as read
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+        {isMobile ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </Button>
+        ) : (
+          <nav className="flex items-center gap-4">
+            <Link
+              to="/explore"
+              className="text-sm font-medium transition-colors hover:text-primary"
+            >
+              Explore Chefs
+            </Link>
+            {!loading && user ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  className="text-sm font-medium transition-colors hover:text-primary"
+                >
+                  Dashboard
+                </Link>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2">
-                      <User className="h-4 w-4" />
-                      Account
+                    <Button variant="ghost" size="icon" className="rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage
+                          src={profile?.avatar_url}
+                          alt={profile?.first_name || user.email}
+                        />
+                        <AvatarFallback>
+                          {profile?.first_name?.[0]?.toUpperCase() ||
+                            user.email?.[0]?.toUpperCase() || "U"}
+                        </AvatarFallback>
+                      </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
-                      Dashboard
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <DropdownMenuItem onClick={() => navigate("/profile")}>
+                      <User className="mr-2 h-4 w-4" />
                       Profile
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut}>
-                      Sign Out
+                    <DropdownMenuItem onClick={() => navigate("/onboarding")}>
+                      <ChefHat className="mr-2 h-4 w-4" />
+                      Chef Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>
+                      Logout
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </div>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => navigate("/auth/signin")}>
-                <User className="h-4 w-4 mr-2" />
-                Sign In
-              </Button>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
-            {user && notifications > 0 && (
-              <Button variant="ghost" size="icon" className="relative mr-2" onClick={() => navigate('/dashboard')}>
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                  {notifications}
-                </span>
-              </Button>
-            )}
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-primary hover:text-accent focus:outline-none"
-            >
-              {isOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile menu */}
-      {isOpen && (
-        <div className="md:hidden">
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  location.pathname === link.href
-                    ? "text-accent"
-                    : "text-primary hover:text-accent"
-                }`}
-                onClick={() => setIsOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-            {user ? (
-              <>
-                <Button variant="outline" size="sm" onClick={handleSignOut} className="w-full mt-4">
-                  Sign Out
-                </Button>
               </>
             ) : (
-              <Button variant="outline" size="sm" className="w-full mt-4" onClick={() => navigate("/auth/signin")}>
-                <User className="h-4 w-4 mr-2" />
-                Sign In
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" onClick={() => navigate("/auth/signin")}>
+                  Sign In
+                </Button>
+                <Button onClick={() => navigate("/auth/signup")}>Sign Up</Button>
+              </div>
             )}
+          </nav>
+        )}
+
+        {isMobile && mobileMenuOpen && (
+          <div className="absolute top-16 left-0 right-0 border-b bg-background p-4 shadow-lg">
+            <nav className="flex flex-col gap-2">
+              <Link
+                to="/explore"
+                className="px-4 py-2 text-sm font-medium hover:bg-muted rounded-md"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Explore Chefs
+              </Link>
+              {!loading && user ? (
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="px-4 py-2 text-sm font-medium hover:bg-muted rounded-md"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/profile"
+                    className="px-4 py-2 text-sm font-medium hover:bg-muted rounded-md"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Profile
+                  </Link>
+                  <Link
+                    to="/onboarding"
+                    className="px-4 py-2 text-sm font-medium hover:bg-muted rounded-md"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Chef Profile
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    className="justify-start px-4 py-2 text-sm font-medium hover:bg-muted rounded-md"
+                    onClick={() => {
+                      handleLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <div className="flex flex-col gap-2 mt-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      navigate("/auth/signin");
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    Sign In
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      navigate("/auth/signup");
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    Sign Up
+                  </Button>
+                </div>
+              )}
+            </nav>
           </div>
-        </div>
-      )}
-    </nav>
+        )}
+      </div>
+    </header>
   );
 };
+
+export default Navigation;
