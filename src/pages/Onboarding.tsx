@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ const Onboarding = () => {
   const [cuisineTypes, setCuisineTypes] = useState<CuisineType[]>([]);
   const [yearsOfExperience, setYearsOfExperience] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasExistingProfile, setHasExistingProfile] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -36,6 +37,49 @@ const Onboarding = () => {
     { value: "american" as CuisineType, label: "American" },
     { value: "other" as CuisineType, label: "Other" }
   ];
+
+  useEffect(() => {
+    const checkExistingProfile = async () => {
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          navigate("/auth/signin");
+          return;
+        }
+
+        // Check if user already has a chef profile
+        const { data: chefProfile } = await supabase
+          .from("chef_profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (chefProfile) {
+          setHasExistingProfile(true);
+          // If they have one, pre-fill the form
+          setBio(chefProfile.bio || "");
+          setHourlyRate(chefProfile.hourly_rate?.toString() || "");
+          setSpecialties(chefProfile.specialties?.join(", ") || "");
+          setLocation(chefProfile.location || "");
+          setCuisineTypes(chefProfile.cuisine_types || []);
+          setYearsOfExperience(chefProfile.years_of_experience?.toString() || "");
+          
+          if (chefProfile.payment_info) {
+            const paymentInfoValue = typeof chefProfile.payment_info === 'object' 
+              ? chefProfile.payment_info.value 
+              : '';
+            setPaymentInfo(paymentInfoValue || "");
+          }
+        }
+      } catch (error) {
+        console.error("Error checking profile:", error);
+      }
+    };
+
+    checkExistingProfile();
+  }, [navigate]);
 
   const handleCuisineToggle = (cuisine: CuisineType) => {
     setCuisineTypes(prev => 
@@ -60,7 +104,7 @@ const Onboarding = () => {
       }
 
       if (isChef) {
-        const { error } = await supabase.from("chef_profiles").insert({
+        const profileData = {
           id: user.id,
           payment_info: { type: "upi", value: paymentInfo },
           bio,
@@ -70,22 +114,38 @@ const Onboarding = () => {
           location,
           years_of_experience: parseInt(yearsOfExperience),
           status: "pending"
-        });
+        };
 
-        if (error) throw error;
+        let result;
+        
+        if (hasExistingProfile) {
+          // Update existing profile
+          result = await supabase.from("chef_profiles")
+            .update(profileData)
+            .eq("id", user.id);
+        } else {
+          // Insert new profile
+          result = await supabase.from("chef_profiles")
+            .insert(profileData);
+        }
+
+        if (result.error) throw result.error;
 
         toast({
-          title: "Profile submitted",
-          description: "Your chef profile is pending approval.",
+          title: hasExistingProfile ? "Profile updated" : "Profile submitted",
+          description: hasExistingProfile 
+            ? "Your chef profile has been updated." 
+            : "Your chef profile is pending approval.",
         });
       }
 
       navigate("/dashboard");
     } catch (error) {
+      console.error("Profile submission error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to submit profile",
       });
     } finally {
       setIsLoading(false);
@@ -133,7 +193,9 @@ const Onboarding = () => {
   return (
     <div className="container max-w-lg py-20">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-4">Complete Your Chef Profile</h1>
+        <h1 className="text-4xl font-bold mb-4">
+          {hasExistingProfile ? "Update Your Chef Profile" : "Complete Your Chef Profile"}
+        </h1>
         <p className="text-muted-foreground">Tell us more about your culinary expertise</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -213,7 +275,9 @@ const Onboarding = () => {
           />
         </div>
         <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? "Submitting..." : "Complete Profile"}
+          {isLoading 
+            ? (hasExistingProfile ? "Updating..." : "Submitting...") 
+            : (hasExistingProfile ? "Update Profile" : "Complete Profile")}
         </Button>
       </form>
     </div>
