@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { Database } from "@/integrations/supabase/types";
 
 // Define the cuisine type to match the database enum
 type CuisineType = Database["public"]["Enums"]["cuisine_type"];
+type ChefStatus = Database["public"]["Enums"]["chef_status"];
 
 const Onboarding = () => {
   const [isChef, setIsChef] = useState<boolean | null>(null);
@@ -66,11 +66,14 @@ const Onboarding = () => {
           setCuisineTypes(chefProfile.cuisine_types || []);
           setYearsOfExperience(chefProfile.years_of_experience?.toString() || "");
           
+          // Safely extract payment_info value
           if (chefProfile.payment_info) {
-            const paymentInfoValue = typeof chefProfile.payment_info === 'object' 
-              ? chefProfile.payment_info.value 
-              : '';
-            setPaymentInfo(paymentInfoValue || "");
+            let paymentValue = "";
+            if (typeof chefProfile.payment_info === 'object' && !Array.isArray(chefProfile.payment_info)) {
+              // It's a JSON object, try to get the value property
+              paymentValue = (chefProfile.payment_info as Record<string, any>)?.value || "";
+            }
+            setPaymentInfo(paymentValue);
           }
         }
       } catch (error) {
@@ -113,7 +116,7 @@ const Onboarding = () => {
           cuisine_types: cuisineTypes,
           location,
           years_of_experience: parseInt(yearsOfExperience),
-          status: "pending"
+          status: "pending" as ChefStatus
         };
 
         let result;
