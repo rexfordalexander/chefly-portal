@@ -19,13 +19,12 @@ import "./App.css";
 const queryClient = new QueryClient();
 
 function App() {
-  console.log("App rendering");
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <div className="min-h-screen flex flex-col bg-white">
+        <div className="min-h-screen flex flex-col">
           <Navigation />
-          <div className="flex-1 w-full mt-16">
+          <div className="flex-1">
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/dashboard" element={<Dashboard />} />

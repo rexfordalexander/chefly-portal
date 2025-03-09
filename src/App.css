@@ -1,15 +1,10 @@
-
-/* Reset default padding that might be hiding content */
 #root {
-  width: 100%;
+  max-width: 1280px;
   margin: 0 auto;
+  padding: 2rem;
   text-align: center;
-  padding: 0;
-  max-height: 100vh;
-  overflow-y: auto;
 }
 
-/* Keep other existing styles but modify them to ensure visibility */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -44,39 +39,4 @@
 
 .read-the-docs {
   color: #888;
-}
-
-/* Ensure body and html take up full space */
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-/* Make sure content is visible with proper colors */
-.min-h-screen {
-  min-height: 100vh;
-  background-color: white;
-  color: #1a1a1a;
-}
-
-/* Ensure content in Index.tsx is properly displayed */
-.flex-col {
-  display: flex;
-  flex-direction: column;
-}
-
-.flex-1 {
-  flex: 1 1 0%;
-}
-
-/* Add some padding to sections */
-section {
-  padding: 1rem 0;
-}
-
-/* Make sure images display properly */
-img {
-  max-width: 100%;
-  height: auto;
 }

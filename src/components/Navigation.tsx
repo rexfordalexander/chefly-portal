@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChefHat, Menu, X, User } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 
 const Navigation = () => {
@@ -18,7 +19,7 @@ const Navigation = () => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const isMobile = useMobile();
 
   useEffect(() => {
     const fetchUserAndProfile = async () => {
