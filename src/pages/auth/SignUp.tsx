@@ -21,8 +21,7 @@ const SignUp = () => {
     setIsLoading(true);
 
     try {
-      // Step 1: Sign up the user
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -34,20 +33,15 @@ const SignUp = () => {
       });
 
       if (signUpError) throw signUpError;
-      if (!data.user) throw new Error("No user returned from sign up");
 
-      // Step 2: Create profile immediately with RLS-compatible approach
-      // We use the service role to bypass RLS during initial profile creation
+      // Create profile
       const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
+        id: (await supabase.auth.getUser()).data.user?.id,
         first_name: firstName,
         last_name: lastName,
       });
 
-      if (profileError) {
-        console.error("Profile creation error:", profileError);
-        // If profile creation fails, we still continue - the trigger may handle it
-      }
+      if (profileError) throw profileError;
 
       toast({
         title: "Account created",
@@ -56,11 +50,10 @@ const SignUp = () => {
 
       navigate("/auth/signin");
     } catch (error) {
-      console.error("Signup error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to create account",
+        description: error.message,
       });
     } finally {
       setIsLoading(false);

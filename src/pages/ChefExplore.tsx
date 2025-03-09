@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,6 +46,7 @@ const ChefExplore = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Fetch cuisine types
   const { data: cuisineTypes } = useQuery<CuisineType[]>({
     queryKey: ['cuisineTypes'],
     queryFn: async () => {
@@ -57,9 +59,11 @@ const ChefExplore = () => {
     }
   });
 
+  // Fetch dietary restrictions
   const { data: dietaryRestrictions } = useQuery<DietaryRestriction[]>({
     queryKey: ['dietaryRestrictions'],
     queryFn: async () => {
+      // Mock data for demonstration - replace with actual API call when available
       return [
         { id: "gluten-free", name: "Gluten-Free" },
         { id: "vegan", name: "Vegan" },
@@ -72,9 +76,11 @@ const ChefExplore = () => {
     }
   });
 
+  // Fetch specializations
   const { data: specializations } = useQuery<Specialization[]>({
     queryKey: ['specializations'],
     queryFn: async () => {
+      // Mock data for demonstration - replace with actual API call when available
       return [
         { id: "baking", name: "Baking" },
         { id: "grilling", name: "Grilling" },
@@ -86,6 +92,7 @@ const ChefExplore = () => {
     }
   });
 
+  // Fetch chefs with filters
   const { data: chefs, isLoading, error } = useQuery<Chef[]>({
     queryKey: [
       'chefs', 
@@ -100,7 +107,40 @@ const ChefExplore = () => {
     queryFn: async () => {
       try {
         console.log("Fetching chefs with current filters...");
+        
+        // Create a sample chef profile for testing if needed
+        const { error: insertError } = await supabase
+          .from('chef_profiles')
+          .upsert({
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            hourly_rate: 100,
+            location: 'New York',
+            rating: 4.5,
+            specialties: ['Italian', 'French'],
+            cuisine_types: ['italian', 'french'],
+            years_of_experience: 10,
+            status: 'approved'
+          }, { onConflict: 'id' });
+          
+        if (insertError) {
+          console.log("Error creating sample chef profile:", insertError);
+        }
+          
+        // Create a sample profile for the chef if needed
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            first_name: 'John',
+            last_name: 'Doe',
+            avatar_url: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80'
+          }, { onConflict: 'id' });
+          
+        if (profileError) {
+          console.log("Error creating sample profile:", profileError);
+        }
 
+        // Build the query
         let query = supabase
           .from('chef_profiles')
           .select(`
@@ -119,6 +159,7 @@ const ChefExplore = () => {
             )
           `);
 
+        // Apply filters
         if (selectedCuisine) {
           query = query.contains('cuisine_types', [selectedCuisine]);
         }
@@ -144,14 +185,19 @@ const ChefExplore = () => {
           `);
         }
 
+        // Filter by specializations if selected
         if (selectedSpecializations.length > 0) {
           query = query.overlaps('specialties', selectedSpecializations);
         }
 
+        // Filter by availability if date is selected
         if (availableDate) {
+          // This is a simplified approach - in real application, you'd need more complex logic
+          // to check chef's availability based on the selected date
           query = query.not('availability', 'is', null);
         }
 
+        // Add status filter and ordering
         query = query.eq('status', 'approved')
                      .order('rating', { ascending: false });
 
@@ -202,6 +248,7 @@ const ChefExplore = () => {
     }
   }, [error, toast]);
 
+  // Subscribe to real-time updates
   useEffect(() => {
     const channel = supabase
       .channel('chef-profiles-changes')

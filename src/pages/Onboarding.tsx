@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,6 @@ import { Database } from "@/integrations/supabase/types";
 
 // Define the cuisine type to match the database enum
 type CuisineType = Database["public"]["Enums"]["cuisine_type"];
-type ChefStatus = Database["public"]["Enums"]["chef_status"];
 
 const Onboarding = () => {
   const [isChef, setIsChef] = useState<boolean | null>(null);
@@ -23,7 +22,6 @@ const Onboarding = () => {
   const [cuisineTypes, setCuisineTypes] = useState<CuisineType[]>([]);
   const [yearsOfExperience, setYearsOfExperience] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [hasExistingProfile, setHasExistingProfile] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -38,52 +36,6 @@ const Onboarding = () => {
     { value: "american" as CuisineType, label: "American" },
     { value: "other" as CuisineType, label: "Other" }
   ];
-
-  useEffect(() => {
-    const checkExistingProfile = async () => {
-      try {
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          navigate("/auth/signin");
-          return;
-        }
-
-        // Check if user already has a chef profile
-        const { data: chefProfile } = await supabase
-          .from("chef_profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (chefProfile) {
-          setHasExistingProfile(true);
-          // If they have one, pre-fill the form
-          setBio(chefProfile.bio || "");
-          setHourlyRate(chefProfile.hourly_rate?.toString() || "");
-          setSpecialties(chefProfile.specialties?.join(", ") || "");
-          setLocation(chefProfile.location || "");
-          setCuisineTypes(chefProfile.cuisine_types || []);
-          setYearsOfExperience(chefProfile.years_of_experience?.toString() || "");
-          
-          // Safely extract payment_info value
-          if (chefProfile.payment_info) {
-            let paymentValue = "";
-            if (typeof chefProfile.payment_info === 'object' && !Array.isArray(chefProfile.payment_info)) {
-              // It's a JSON object, try to get the value property
-              paymentValue = (chefProfile.payment_info as Record<string, any>)?.value || "";
-            }
-            setPaymentInfo(paymentValue);
-          }
-        }
-      } catch (error) {
-        console.error("Error checking profile:", error);
-      }
-    };
-
-    checkExistingProfile();
-  }, [navigate]);
 
   const handleCuisineToggle = (cuisine: CuisineType) => {
     setCuisineTypes(prev => 
@@ -108,7 +60,7 @@ const Onboarding = () => {
       }
 
       if (isChef) {
-        const profileData = {
+        const { error } = await supabase.from("chef_profiles").insert({
           id: user.id,
           payment_info: { type: "upi", value: paymentInfo },
           bio,
@@ -117,39 +69,23 @@ const Onboarding = () => {
           cuisine_types: cuisineTypes,
           location,
           years_of_experience: parseInt(yearsOfExperience),
-          status: "pending" as ChefStatus
-        };
+          status: "pending"
+        });
 
-        let result;
-        
-        if (hasExistingProfile) {
-          // Update existing profile
-          result = await supabase.from("chef_profiles")
-            .update(profileData)
-            .eq("id", user.id);
-        } else {
-          // Insert new profile
-          result = await supabase.from("chef_profiles")
-            .insert(profileData);
-        }
-
-        if (result.error) throw result.error;
+        if (error) throw error;
 
         toast({
-          title: hasExistingProfile ? "Profile updated" : "Profile submitted",
-          description: hasExistingProfile 
-            ? "Your chef profile has been updated." 
-            : "Your chef profile is pending approval.",
+          title: "Profile submitted",
+          description: "Your chef profile is pending approval.",
         });
       }
 
-      navigate("/profile");
+      navigate("/dashboard");
     } catch (error) {
-      console.error("Profile submission error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to submit profile",
+        description: error.message,
       });
     } finally {
       setIsLoading(false);
@@ -197,9 +133,7 @@ const Onboarding = () => {
   return (
     <div className="container max-w-lg py-20">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-4">
-          {hasExistingProfile ? "Update Your Chef Profile" : "Complete Your Chef Profile"}
-        </h1>
+        <h1 className="text-4xl font-bold mb-4">Complete Your Chef Profile</h1>
         <p className="text-muted-foreground">Tell us more about your culinary expertise</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -279,9 +213,7 @@ const Onboarding = () => {
           />
         </div>
         <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading 
-            ? (hasExistingProfile ? "Updating..." : "Submitting...") 
-            : (hasExistingProfile ? "Update Profile" : "Complete Profile")}
+          {isLoading ? "Submitting..." : "Complete Profile"}
         </Button>
       </form>
     </div>

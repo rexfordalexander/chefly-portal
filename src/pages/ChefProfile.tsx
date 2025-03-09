@@ -214,29 +214,12 @@ const ChefProfile = () => {
           </div>
         </div>
         
-        <Card className="mb-8">
+        <Card className="mb-12">
           <CardHeader>
             <CardTitle>About {chef.profiles.first_name}</CardTitle>
           </CardHeader>
           <CardContent>
             <p>{chef.bio}</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="mb-12">
-          <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
-            <CardDescription>Get in touch with {chef.profiles.first_name} for any questions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Mail className="h-5 w-5 text-muted-foreground" />
-              <span>Contact through booking system</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Phone className="h-5 w-5 text-muted-foreground" />
-              <span>Available after booking confirmation</span>
-            </div>
           </CardContent>
         </Card>
         
